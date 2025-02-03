@@ -1,4 +1,4 @@
-# Computational Measurement of Curvature: Aligning Image Analysis with Human Behaviour and Neural Data
+# Computational Curvature Analysis: Bridging Image Processing, Human Perception, and Brain Activity
 This study investigates how curvature influences visual perception and cognition by developing a novel method for computing curvature from contours in drawings. I compare this approach with curved Wavelet filters and human curvature ratings to analyze how curvature is represented in natural scenes. Using neural data, I examine how sensitivity to different degrees of curvature is distributed across the visual cortex. These findings provide new insights into computational curvature analysis and its role in visual processing.
 
 [Ppt link](https://drive.google.com/file/d/1O5kGABUJNYFPZ00kdIj87_l478FKHiJw/view?usp=sharing)
