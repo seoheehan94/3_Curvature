@@ -38,7 +38,7 @@ for pic=1:nPics
         SF=SFlist(s);
         for t=1:length(thetaList)
             theta=thetaList(t);
-            [outputMatrix(pic,s,t), recMap(:,:,s,t)] =applyAngleFilters_AllRotations(Img,SF,theta,0);
+            [outputMatrix(pic,s,t), recMap(:,:,s,t)] =applyAngleFilters_AllRotations(Img,'curve',SF,theta,0);
         end
     end
     recMap_mean=squeeze(mean(recMap,3));
