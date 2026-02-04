@@ -23,7 +23,9 @@ for cur = 1:7
     [spearmanTotal(cur,1), spearmanTotal(cur,2)] = corr(curFilter, curMLV, 'Type', 'Spearman');
 
 end
+meanFilterMLV = array2table([curMLV, curFilter], 'VariableNames', ["meanCurvMLV", "meanCurvFilter"]);
 
+writetable(meanFilterMLV,[filedir, 'Curvature_MLV/meanCurvMLVFilter.csv']);
 saveName = [filedir, 'Curvature_MLV/compareFilterMLVbrain.mat'];
 save(saveName, "spearmanTotal","pearsonTotal");
 %% Is my data normally distributed?
