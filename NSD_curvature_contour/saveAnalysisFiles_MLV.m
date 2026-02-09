@@ -117,7 +117,8 @@ end
 %% make a brain volume
 
 for isub = 1:8
-    clearvars -except isub roiNames combinedRoiNames prffolder
+    fprintf('isub:%d. ...\n',isub);
+    clearvars -except isub roiNames combinedRoiNames prffolder save_brainfolder
 
     load(fullfile([prffolder, 'voxCurvCoef_sub', num2str(isub), '.mat']));
 
@@ -215,7 +216,49 @@ for isub = 1:8
         r2Brain(ourBrain == visualRegion) = roiNsdCurvR2.(thisfield)(1,:);
     end
 
-    %% save nifti
+    for visualRegion = 1:7
+        curOurBrain = ourBrain;
+        % if visualRegion == 2
+        %     curOurBrain(visRoiData == 3 | visRoiData == 4) = 2;
+        % elseif visualRegion == 3
+        %     curOurBrain(visRoiData == 5 | visRoiData == 6) = 3;
+        % end
+        curNewBrain = curOurBrain;
+        curNewBrain(curOurBrain ~= visualRegion) = NaN;
+        thisfield = combinedRoiNames{visualRegion};
+
+        curNewBrain(curOurBrain == visualRegion) = roiNsdCurvR2.(thisfield)(1,:);
+
+        r2BrainbyROI(:,:,:,visualRegion) =curNewBrain;
+    end
+
+
+
+    % only R2 >0 voxels
+    r2Mask = r2Brain > 0;
+    newBrain_max_R2pos        = newBrain_max;
+    newBrain_max_R2pos(~r2Mask) = NaN;
+
+    newBrain_wmean_R2pos        = newBrain_wmean;
+    newBrain_wmean_R2pos(~r2Mask) = NaN;
+
+    newBrainbyROI_max_R2pos = newBrainbyROI_max;
+    for v = 1:size(newBrainbyROI_max,4)
+        tmp = newBrainbyROI_max(:,:,:,v);
+        tmp(~r2Mask) = NaN;
+        newBrainbyROI_max_R2pos(:,:,:,v) = tmp;
+    end
+
+    newBrainbyROI_wmean_R2pos = newBrainbyROI_wmean;
+    for v = 1:size(newBrainbyROI_wmean,4)
+        tmp = newBrainbyROI_wmean(:,:,:,v);
+        tmp(~r2Mask) = NaN;
+        newBrainbyROI_wmean_R2pos(:,:,:,v) = tmp;
+    end
+
+
+
+    % save nifti
     % reference NIfTI (orientation / spatial metadata)
     refFile = ['/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Orientation/brainVolume/betas_session01_sub', ...
         num2str(isub), '.nii.gz'];
@@ -227,30 +270,56 @@ for isub = 1:8
         'SpatialDimension', info_ref.SpatialDimension, ...
         'Transform', info_ref.Transform, ...
         'Qfactor', info_ref.Qfactor, ...
-        'AuxiliaryFile', info_ref.AuxiliaryFile, ...
-        'raw', info_ref.raw);
+        'AuxiliaryFile', info_ref.AuxiliaryFile);
 
     % outputs to write: {data, filename}
     outputs = {
-        newBrain_max,        'curvMLVBrain_max';
-        newBrainbyROI_max,   'curvMLVBrainbyROI_max'
-        newBrain_wmean,        'curvMLVBrain_wmean';
-        newBrainbyROI_wmean,   'curvMLVBrainbyROI_max'
-        r2Brain
+        newBrain_max,          'curvMLVBrain_max',        false;
+        newBrainbyROI_max,     'curvMLVBrainbyROI_max',   true;
+        newBrain_wmean,        'curvMLVBrain_wmean',      false;
+        newBrainbyROI_wmean,   'curvMLVBrainbyROI_wmean', true;
+
+        r2Brain,               'curvMLVBrain_R2',         false;
+        r2BrainbyROI,               'curvMLVBrain_R2byROI',         true;
+
+        % R2 > 0 masked versions
+        newBrain_max_R2pos,           'curvMLVBrain_max_posR2',                      false;
+        newBrainbyROI_max_R2pos,      'curvMLVBrainbyROI_max_posR2',                 true;
+        newBrain_wmean_R2pos,         'curvMLVBrain_wmean_posR2',                    false;
+        newBrainbyROI_wmean_R2pos,    'curvMLVBrainbyROI_wmean_posR2',               true
         };
 
     for i = 1:size(outputs,1)
         data = outputs{i,1};
         fname = fullfile(save_brainfolder, ...
             [outputs{i,2}, '_sub', num2str(isub), '.nii']);
+        useRef = outputs{i,3};
 
-        % write once to generate base header
+        % write once to create header
         niftiwrite(data, fname);
 
-        % read header, overwrite spatial info, rewrite
+        % read header and overwrite spatial metadata
         info_new = niftiinfo(fname);
-        info_new = copySpatialInfo(info_new);
 
+        % pixel dimensions (conditional)
+        if useRef
+            info_new.PixelDimensions = info_ref.PixelDimensions;
+        else
+            info_new.PixelDimensions = [1.8 1.8 1.8];
+        end
+        info_new.TransformName     = info_ref.TransformName;
+        info_new.SpatialDimension  = info_ref.SpatialDimension;
+        info_new.Transform         = info_ref.Transform;
+        info_new.Qfactor           = info_ref.Qfactor;
+        info_new.AuxiliaryFile     = info_ref.AuxiliaryFile;
+        info_new.raw.pixdim        = info_ref.raw.pixdim;
+        info_new.raw.aux_file      = info_ref.raw.aux_file;
+        info_new.raw.sform_code    = info_ref.raw.sform_code;
+        info_new.raw.srow_x        = info_ref.raw.srow_x;
+        info_new.raw.srow_y        = info_ref.raw.srow_y;
+        info_new.raw.srow_z        = info_ref.raw.srow_z;
+
+        % rewrite with corrected header
         niftiwrite(data, fname, info_new);
     end
 

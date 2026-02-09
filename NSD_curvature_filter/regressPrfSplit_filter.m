@@ -12,7 +12,7 @@
 %   uses files created by: prfSampleModel.m, prfSampleModel_synth.m
 %   creates files used by: getVoxPref.m
 
-function regressPrfSplit_curvature(isub,visualRegions)
+function regressPrfSplit_filter(isub,visualRegions)
 addpath(genpath('/home/hanseohe/Documents/GitHub/nsdOtopy'));
 
 tic;
@@ -23,7 +23,7 @@ nsessions=nsessionsSub(isub);
 nsplits=2;
 bandpass = 1; bandMin = 1; bandMax = 1;
 
-boxfolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature/prfsample_Curv/';
+boxfolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_filter/prfsample_Curv/';
 betasfolder = ['/bwdata/NSDData/nsddata_betas/ppdata/subj0' num2str(isub) '/func1pt8mm/betas_fithrf_GLMdenoise_RR/'];
 % stimfilename = fullfile(folder,'nsdsynthetic_colorstimuli_subj01.hdf5');
 nsdfolder = '/bwdata/NSDData/nsddata/experiments/nsd/';
@@ -218,7 +218,7 @@ for visualRegion=visualRegions
     nsd.r2 = r2;
     nsd.r2curv = r2curv;
     nsd.r2split = r2split;
-    nsd.r2lenSplit = r2lenSplit;
+    nsd.r2curvSplit = r2curvSplit;
     nsd.pearsonRcurv = pearsonRcurv;
     nsd.pearsonR = pearsonR;
     nsd.imgNum = imgNum;
