@@ -141,15 +141,18 @@ summary_by_roi_filter
 summary_by_roi_method <- all_data %>%
   group_by(ROI, method) %>%
   summarise(
-    n          = n(),
-    n_R2_pos   = sum(R2 > 0, na.rm = TRUE),
-    prop_R2_pos = mean(R2 > 0, na.rm = TRUE),
-    mean_R2_pos = ifelse(n_R2_pos > 0,
-                         mean(R2[R2 > 0], na.rm = TRUE),
-                         NA_real_),
+    n            = n(),
+    n_R2_pos     = sum(R2 > 0, na.rm = TRUE),
+    prop_R2_pos  = mean(R2 > 0, na.rm = TRUE),
+    se_prop_R2   = sqrt(prop_R2_pos * (1 - prop_R2_pos) / n),
+    mean_R2_pos  = ifelse(n_R2_pos > 0,
+                          mean(R2[R2 > 0], na.rm = TRUE),
+                          NA_real_),
+    se_mean_R2   = ifelse(n_R2_pos > 1,
+                          sd(R2[R2 > 0], na.rm = TRUE) / sqrt(n_R2_pos),
+                          NA_real_),
     .groups = "drop"
   )
-
 
 # "Proportion of positive R2 values by ROI"
 prop_tests <- summary_by_roi_method %>%
@@ -225,7 +228,6 @@ ggplot(pos_data %>% filter(ROI == "hV4", method == "filter"),
   theme_classic()
 
 ## 2b. Wilcoxon rank‑sum tests by ROI × method ----------------
-pos_data <- all_data %>% filter(R2 > 0)
 
 wilcox_results <- pos_data %>%
   group_by(ROI) %>%
@@ -279,27 +281,63 @@ wilcox_results
 ## ---------------------------------------------------------- #
 
 # "Proportion of positive R2 values by ROI"
+prop_labels <- prop_tests %>%
+  mutate(
+    y_pos = pmax(prop1, prop2) + 0.03  # a bit above the taller bar
+  ) %>%
+  select(ROI, sig_prop, y_pos)
+
+dodge <- position_dodge(width = 0.7)
 
 ggplot(summary_by_roi_method,
        aes(x = ROI, y = prop_R2_pos, fill = method)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_col(position = dodge, width = 0.6) +
+  geom_errorbar(
+    aes(ymin = prop_R2_pos - se_prop_R2,
+        ymax = prop_R2_pos + se_prop_R2),
+    position = dodge,
+    width = 0.2
+  ) +
   coord_cartesian(ylim = c(0.2, 0.95)) +
+  geom_text(data = prop_labels,
+            aes(x = ROI, y = y_pos, label = sig_prop),
+            inherit.aes = FALSE,
+            vjust = 0) +
   labs(
     x = "ROI",
     y = "Proportion of R2 > 0",
     fill = "Method"
   ) +
-  theme_classic()
+  theme_classic(base_size = 14)
 
 # "Mean positive R2 values by ROI"
+mean_labels <- wilcox_results %>%
+  mutate(
+    y_pos = pmax(mean1, mean2) + 0.002   # adjust offset to your scale
+  ) %>%
+  select(ROI, sig_wilcox, y_pos)
+
+dodge <- position_dodge(width = 0.7)
+
 ggplot(summary_by_roi_method,
        aes(x = ROI, y = mean_R2_pos, fill = method)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_col(position = dodge, width = 0.6) +
+  geom_errorbar(
+    aes(ymin = mean_R2_pos - se_mean_R2,
+        ymax = mean_R2_pos + se_mean_R2),
+    position = dodge,
+    width = 0.2
+  ) +
   coord_cartesian(ylim = c(0.002, 0.05)) +
+  geom_text(data = mean_labels,
+            aes(x = ROI, y = y_pos, label = sig_wilcox),
+            inherit.aes = FALSE,
+            vjust = 0) +
   labs(
     x = "ROI",
     y = "Mean R2 (R2 > 0 only)",
     fill = "Method"
   ) +
-  theme_classic()
+  theme_classic(base_size = 14)
+
 
