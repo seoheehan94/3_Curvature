@@ -2,9 +2,9 @@
 clear all;
 roiNames = {'V1v','V1d','V2v','V2d','V3v','V3d','hV4','OPA','PPA','RSC'};
 combinedRoiNames = {'V1','V2','V3','hV4','OPA','PPA','RSC'};
-prffolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_filter/prfsample_Curv/';
-save_brainfolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_filter/brainVolume';
-save_analysisfolder = '/home/hanseohe/Documents/GitHub/3_Curvature/NSD/analysis/';
+prffolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_MLV/prfsample_CurvMLV/';
+save_brainfolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_MLV/brainVolume';
+save_analysisfolder = '/home/hanseohe/Documents/GitHub/3_Curvature/analysis/';
 
 
 %% 1.  get R2 %%
@@ -37,14 +37,11 @@ for isub = 1:8
         nvox = numel(R2_vals);
         nvoxCurv = numel(curv_vals);
 
-        if nvox ~= nvoxCurv
-            warning('Voxel count mismatch: subj %d, ROI %s: nR2=%d, nCurv=%d', ...
-                isub, roiName, nvox, nvoxCurv);
-        end
+
 
 
         subj_all = [subj_all;  repmat(isub, nvox, 1)];
-        roi_all  = [roi_all;   repmat({roiName}, nvox, 1)];
+        roi_all  = [roi_all;   repmat(roiName, nvox, 1)];
         R2_all   = [R2_all;    R2_vals(:)];
         curv_all   = [curv_all;    curv_vals(:)];
     end
@@ -57,8 +54,59 @@ T_curv = table(subj_all, roi_all, curv_all, ...
              'VariableNames', {'subj', 'ROI', 'curvPref'});
 
 % Save one "all ROI" file for MLV
-writetable(T_R2, fullfile(save_analysisfolder, 'allROI_R2_filter.csv'));
-writetable(T_curv, fullfile(save_analysisfolder, 'allROI_curvPref_filter.csv'));
+writetable(T_R2, fullfile(save_analysisfolder, 'allROI_R2_MLV.csv'));
+writetable(T_curv, fullfile(save_analysisfolder, 'allROI_curvPref_MLV.csv'));
+
+
+
+% totalR2CurvSplit = [];
+% for isub = 1:8
+%     fprintf('isub:%d. ...\n',isub);
+%     load([prffolder 'voxCurvCoef_sub' num2str(isub) '.mat']);
+%     % total values of R
+%     totalR2CurvSplit{end+1} = roiNsdCurvR2;
+% 
+% end
+% 
+% curRoiR2CurvSplit = [];
+% curV1R2CurvSplit  = [];
+% curV2R2CurvSplit  = [];
+% curV3R2CurvSplit  = [];
+% curhV4R2CurvSplit  = [];
+% curPPAR2CurvSplit = [];
+% curOPAR2CurvSplit = [];
+% curRSCR2CurvSplit = [];
+% 
+% for j = 1:numel(totalR2CurvSplit)
+% 
+%     % loop over all ROIs for the "all-roi" vector
+%     for r = 1:numel(combinedRoiNames)
+%         roiName = combinedRoiNames{r};
+%         curRoiR2CurvSplit = [curRoiR2CurvSplit, ...
+%             totalR2CurvSplit{j}.(roiName)];
+%     end
+% 
+%     % keep ROI-specific vectors if you still want them
+%     curV1R2CurvSplit  = [curV1R2CurvSplit,  totalR2CurvSplit{j}.V1];
+%     curV2R2CurvSplit  = [curV2R2CurvSplit,  totalR2CurvSplit{j}.V2];
+%     curV3R2CurvSplit  = [curV3R2CurvSplit,  totalR2CurvSplit{j}.V3];
+%     curhV4R2CurvSplit  = [curhV4R2CurvSplit,  totalR2CurvSplit{j}.hV4];
+%     curPPAR2CurvSplit = [curPPAR2CurvSplit, totalR2CurvSplit{j}.PPA];
+%     curOPAR2CurvSplit = [curOPAR2CurvSplit, totalR2CurvSplit{j}.OPA];
+%     curRSCR2CurvSplit = [curRSCR2CurvSplit, totalR2CurvSplit{j}.RSC];
+% end
+% %
+% writematrix(curRoiR2CurvSplit', ...
+%     fullfile(save_R2folder, ['allroiR2_MLV','.csv']));
+% 
+% for r = 1:numel(combinedRoiNames)
+%     roiName = combinedRoiNames{r};
+%     dataVar = eval(['cur' roiName 'R2CurvSplit']);
+% 
+%     writematrix(dataVar', ...
+%         fullfile(save_R2folder, [roiName 'R2_MLV', '.csv']));
+% end
+
 
 
 
@@ -223,19 +271,19 @@ for isub = 1:8
 
     % outputs to write: {data, filename}
     outputs = {
-        newBrain_max,          'curvfilterBrain_max',        false;
-        newBrainbyROI_max,     'curvfilterBrainbyROI_max',   true;
-        newBrain_wmean,        'curvfilterBrain_wmean',      false;
-        newBrainbyROI_wmean,   'curvfilterBrainbyROI_wmean', true;
+        newBrain_max,          'curvMLVBrain_max',        false;
+        newBrainbyROI_max,     'curvMLVBrainbyROI_max',   true;
+        newBrain_wmean,        'curvMLVBrain_wmean',      false;
+        newBrainbyROI_wmean,   'curvMLVBrainbyROI_wmean', true;
 
-        r2Brain,               'curvfilterBrain_R2',         false;
-        r2BrainbyROI,               'curvfilterBrain_R2byROI',         true;
+        r2Brain,               'curvMLVBrain_R2',         false;
+        r2BrainbyROI,               'curvMLVBrain_R2byROI',         true;
 
         % R2 > 0 masked versions
-        newBrain_max_R2pos,           'curvfilterBrain_max_posR2',                      false;
-        newBrainbyROI_max_R2pos,      'curvfilterBrainbyROI_max_posR2',                 true;
-        newBrain_wmean_R2pos,         'curvfilterBrain_wmean_posR2',                    false;
-        newBrainbyROI_wmean_R2pos,    'curvfilterBrainbyROI_wmean_posR2',               true
+        newBrain_max_R2pos,           'curvMLVBrain_max_posR2',                      false;
+        newBrainbyROI_max_R2pos,      'curvMLVBrainbyROI_max_posR2',                 true;
+        newBrain_wmean_R2pos,         'curvMLVBrain_wmean_posR2',                    false;
+        newBrainbyROI_wmean_R2pos,    'curvMLVBrainbyROI_wmean_posR2',               true
         };
 
     for i = 1:size(outputs,1)
