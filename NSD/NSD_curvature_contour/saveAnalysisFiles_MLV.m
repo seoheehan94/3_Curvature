@@ -4,115 +4,64 @@ roiNames = {'V1v','V1d','V2v','V2d','V3v','V3d','hV4','OPA','PPA','RSC'};
 combinedRoiNames = {'V1','V2','V3','hV4','OPA','PPA','RSC'};
 prffolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_MLV/prfsample_CurvMLV/';
 save_brainfolder = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_MLV/brainVolume';
-save_R2folder = '/home/hanseohe/Documents/GitHub/3_Curvature/NSD_curvature_contour/R2_analysis/';
+save_analysisfolder = '/home/hanseohe/Documents/GitHub/3_Curvature/NSD/analysis/';
 
 
-%% 1.  get mean R2 %%
-totalR2CurvSplit = [];
+%% 1.  get R2 %%
+
+totalR2CurvSplit = cell(1, 8);
+totalMaxCurv     = cell(1, 8);
+
 for isub = 1:8
-    fprintf('isub:%d. ...\n',isub);
-    load([prffolder 'voxCurvCoef_sub' num2str(isub) '.mat']);
-    % total values of R
-    totalR2CurvSplit{end+1} = roiNsdCurvR2;
-
+    fprintf('isub:%d...\n', isub);
+    load([prffolder 'voxCurvCoef_sub' num2str(isub) '.mat']); % should load roiNsdCurvR2
+    totalR2CurvSplit{isub} = roiNsdCurvR2;
+    totalMaxCurv{isub} = maxCoefCurv;
 end
 
-curRoiR2CurvSplit = [];
-curV1R2CurvSplit  = [];
-curV2R2CurvSplit  = [];
-curV3R2CurvSplit  = [];
-curhV4R2CurvSplit  = [];
-curPPAR2CurvSplit = [];
-curOPAR2CurvSplit = [];
-curRSCR2CurvSplit = [];
+% Preallocate containers for long-format data
+subj_all = [];
+roi_all  = {};
+R2_all   = [];
+curv_all = [];
 
-for j = 1:numel(totalR2CurvSplit)
+for isub = 1:8
+    roiStruct = totalR2CurvSplit{isub};
+    roiStructCurv = totalMaxCurv{isub};
 
-    % loop over all ROIs for the "all-roi" vector
     for r = 1:numel(combinedRoiNames)
         roiName = combinedRoiNames{r};
-        curRoiR2CurvSplit = [curRoiR2CurvSplit, ...
-            totalR2CurvSplit{j}.(roiName)];
-    end
+        R2_vals = roiStruct.(roiName);  % vector of R2 for this subj & ROI
+        curv_vals = roiStructCurv.(roiName);
+        
+        nvox = numel(R2_vals);
+        nvoxCurv = numel(curv_vals);
 
-    % keep ROI-specific vectors if you still want them
-    curV1R2CurvSplit  = [curV1R2CurvSplit,  totalR2CurvSplit{j}.V1];
-    curV2R2CurvSplit  = [curV2R2CurvSplit,  totalR2CurvSplit{j}.V2];
-    curV3R2CurvSplit  = [curV3R2CurvSplit,  totalR2CurvSplit{j}.V3];
-    curhV4R2CurvSplit  = [curhV4R2CurvSplit,  totalR2CurvSplit{j}.hV4];
-    curPPAR2CurvSplit = [curPPAR2CurvSplit, totalR2CurvSplit{j}.PPA];
-    curOPAR2CurvSplit = [curOPAR2CurvSplit, totalR2CurvSplit{j}.OPA];
-    curRSCR2CurvSplit = [curRSCR2CurvSplit, totalR2CurvSplit{j}.RSC];
-end
-%
-writematrix(curRoiR2CurvSplit', ...
-    fullfile(save_R2folder, ['allroiR2_MLV','.csv']));
+        if nvox ~= nvoxCurv
+            warning('Voxel count mismatch: subj %d, ROI %s: nR2=%d, nCurv=%d', ...
+                isub, roiName, nvox, nvoxCurv);
+        end
 
-for r = 1:numel(combinedRoiNames)
-    roiName = combinedRoiNames{r};
-    dataVar = eval(['cur' roiName 'R2CurvSplit']);
 
-    writematrix(dataVar', ...
-        fullfile(save_R2folder, [roiName 'R2_MLV', '.csv']));
-end
-
-% mean R² voxels
-meanR2Curv = struct;
-meanR2Curv.all = mean(curRoiR2CurvSplit, 'omitnan');
-
-for r = 1:numel(combinedRoiNames)
-    roiName = combinedRoiNames{r};
-    dataVar = eval(['cur' roiName 'R2CurvSplit']);
-    meanR2Curv.(roiName) = mean(dataVar, 'omitnan');
-end
-
-% number of positive R² voxels
-nPosR2Curv = struct;
-
-validAll = ~isnan(curRoiR2CurvSplit);
-nPosR2Curv.all = sum(curRoiR2CurvSplit(validAll) > 0);
-nPosR2Curv.all_total = sum(validAll);
-
-for r = 1:numel(combinedRoiNames)
-    roiName = combinedRoiNames{r};
-    dataVar = eval(['cur' roiName 'R2CurvSplit']);
-
-    valid = ~isnan(dataVar);
-
-    nPosR2Curv.(roiName) = sum(dataVar(valid) > 0);
-    nPosR2Curv.([roiName '_total']) = sum(valid);
-end
-
-% proportion of positive R² voxels
-propPosR2Curv = struct;
-
-propPosR2Curv.all = ...
-    nPosR2Curv.all / nPosR2Curv.all_total;
-
-for r = 1:numel(combinedRoiNames)
-    roiName = combinedRoiNames{r};
-    propPosR2Curv.(roiName) = ...
-        nPosR2Curv.(roiName) / nPosR2Curv.([roiName '_total']);
-end
-
-%mean R² of positive voxels only
-meanPosR2Curv = struct;
-
-maskAll = curRoiR2CurvSplit > 0 & ~isnan(curRoiR2CurvSplit);
-meanPosR2Curv.all = mean(curRoiR2CurvSplit(maskAll), 'omitnan');
-
-for r = 1:numel(combinedRoiNames)
-    roiName = combinedRoiNames{r};
-    dataVar = eval(['cur' roiName 'R2CurvSplit']);
-
-    mask = dataVar > 0 & ~isnan(dataVar);
-
-    if any(mask)
-        meanPosR2Curv.(roiName) = mean(dataVar(mask), 'omitnan');
-    else
-        meanPosR2Curv.(roiName) = NaN;
+        subj_all = [subj_all;  repmat(isub, nvox, 1)];
+        roi_all  = [roi_all;   repmat({roiName}, nvox, 1)];
+        R2_all   = [R2_all;    R2_vals(:)];
+        curv_all   = [curv_all;    curv_vals(:)];
     end
 end
+
+% Build table: subj, ROI, R2, curv
+T_R2 = table(subj_all, roi_all, R2_all, ...
+             'VariableNames', {'subj', 'ROI', 'R2'});
+T_curv = table(subj_all, roi_all, curv_all, ...
+             'VariableNames', {'subj', 'ROI', 'curvPref'});
+
+% Save one "all ROI" file for MLV
+writetable(T_R2, fullfile(save_analysisfolder, 'allROI_R2_MLV.csv'));
+writetable(T_curv, fullfile(save_analysisfolder, 'allROI_curvPref_MLV.csv'));
+
+
+
 
 %% make a brain volume
 
