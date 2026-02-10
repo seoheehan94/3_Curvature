@@ -1,87 +1,163 @@
 % getGroupMean.m
-% For the group map, we computed the circular mean across subjects for each vertex in V1–V4, 
+% For the group map, we computed the weighted mean across subjects for each vertex,
 % weighted by the full model R2 values.
 clear all;
+nSub = 8;
+hemis = {'lh','rh'};
+modelList = { ...
+    % 'curvfilterBrain_max', ...
+    % 'curvfilterBrain_wmean', ...
+    'curvfilterBrain_max_posR2', ...
+    % 'curvfilterBrain_wmean_posR2'
+    };
 
-filedir = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature/surfaceData/';
+filedir = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_filter/surfaceData/';
 
-[~,M,mr] = load_mgh('/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature/surfaceData/sub1/curvBrain_sub1_lh_fsaverage.mgh');
-%save_mgh(vol, 'orig.stripped.mgz', M,mr);
-%result = MRIread('/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Orientation/surfaceData/sub1/angleBrain_sub1_lh_fsaverage.mgh');
+[~,M,mr] = load_mgh('/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_filter/surfaceData/sub1/curvfilterBrain_max_sub1_lh_fsaverage.mgh');
 
-%% get all subjects volume in radians
-% what to do with -1 and 0?
-for isub=1:8
-    vol_lh(:,isub) = load_mgh([filedir, 'sub', num2str(isub), '/curvBrain_sub', num2str(isub), '_lh_fsaverage.mgh']);
-    vol_rh(:,isub) = load_mgh([filedir, 'sub', num2str(isub), '/curvBrain_sub', num2str(isub), '_rh_fsaverage.mgh']);
+for imodel = 1:numel(modelList)
+    modelName = modelList{imodel};
+   
+    %% load volumes
+    clear vol_lh vol_rh R2_lh R2_rh
+
+    for isub = 1:nSub
+        vol_lh(:,isub) = load_mgh([filedir,'sub',num2str(isub),'/', ...
+            modelName,'_sub',num2str(isub),'_lh_fsaverage.mgh']);
+
+        vol_rh(:,isub) = load_mgh([filedir,'sub',num2str(isub),'/', ...
+            modelName,'_sub',num2str(isub),'_rh_fsaverage.mgh']);
+
+        % R2 (same for all models unless you have model-specific R2)
+        R2_lh(:,isub) = load_mgh([filedir,'sub',num2str(isub),'/', ...
+            'curvfilterBrain_R2_sub',num2str(isub),'_lh_fsaverage.mgh']);
+
+        R2_rh(:,isub) = load_mgh([filedir,'sub',num2str(isub),'/', ...
+            'curvfilterBrain_R2_sub',num2str(isub),'_rh_fsaverage.mgh']);
+    end
+
+
+    %% weighted mean
+    R2_lh_pos = R2_lh;
+    R2_lh_pos = R2_lh_pos - min(R2_lh_pos, [], 2);
+    R2_rh_pos = R2_rh;
+    R2_rh_pos = R2_rh_pos - min(R2_rh_pos, [], 2);
+
+    prefCurv_lh = nansum(vol_lh .* R2_lh_pos, 2) ./ nansum(R2_lh_pos, 2);
+    prefCurv_rh = nansum(vol_rh .* R2_rh_pos, 2) ./ nansum(R2_rh_pos, 2);
+
+
+
+    %% save
+    save_mgh(prefCurv_lh, ...
+        [filedir, modelName, '_groupmean_lh_fsaverage.mgh'], M, mr);
+
+    save_mgh(prefCurv_rh, ...
+        [filedir, modelName, '_groupmean_rh_fsaverage.mgh'], M, mr);
+
+
+    % %% Top-50% R² voxel survival
+    % 
+    % meanR2_lh = nanmean(R2_lh, 2);
+    % meanR2_rh = nanmean(R2_rh, 2);
+    % 
+    % thr_lh = prctile(meanR2_lh, 50);
+    % thr_rh = prctile(meanR2_rh, 50);
+    % 
+    % mask_lh = meanR2_lh >= thr_lh;
+    % mask_rh = meanR2_rh >= thr_rh;
+    % 
+    % prefCurv_lh_top50 = prefCurv_lh;
+    % prefCurv_rh_top50 = prefCurv_rh;
+    % 
+    % prefCurv_lh_top50(~mask_lh) = NaN;
+    % prefCurv_rh_top50(~mask_rh) = NaN;
+    % 
+    % 
+    % save_mgh(prefCurv_lh_top50, ...
+    %     [filedir, modelName, '_groupmean_lh_fsaverage_top50R2.mgh'], M, mr);
+    % 
+    % save_mgh(prefCurv_rh_top50, ...
+    %     [filedir, modelName, '_groupmean_rh_fsaverage_top50R2.mgh'], M, mr);
 end
-
-vol_lh(vol_lh==0)=NaN;
-vol_lh(vol_lh==-1)=NaN;
-vol_rh(vol_rh==0)=NaN;
-vol_rh(vol_rh==-1)=NaN;
-
-%% weighted circ mean
-prefCurv_lh = [];
-prefCurv_rh = [];
-for ivox=1:size(vol_lh,1)
-    prefCurv_lh(ivox) = mean(vol_lh(ivox,:)', 'omitnan');
-end
-for ivox=1:size(vol_rh,1)
-    prefCurv_rh(ivox) = mean(vol_rh(ivox,:)', 'omitnan');
-end
-
-
-prefCurv_lh = prefCurv_lh';
-prefCurv_rh = prefCurv_rh';
-
-%% save
-fileName_lh = [filedir,'curvBrain__groupmean_lh_fsaverage.mgh'];
-fileName_rh = [filedir, 'curvBrain__groupmean_rh_fsaverage.mgh'];
-save_mgh(prefCurv_lh, fileName_lh, M,mr);
-save_mgh(prefCurv_rh, fileName_rh, M,mr);
-
 
 %%
 clear all;
+nSub = 8;
+hemis = {'lh','rh'};
+modelList = { ...
+    % 'curvfilterBrainbyROI_max', ...
+    % 'curvfilterBrainbyROI_wmean', ...
+    'curvfilterBrainbyROI_max_posR2', ...
+    % 'curvfilterBrainbyROI_wmean_posR2'
+    };
 
-filedir = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature/surfaceData/';
+filedir = '/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_filter/surfaceData/';
 
-[mghfile,M,mr] = load_mgh('/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature/surfaceData/sub1/curvBrainbyROI_sub1_lh_fsaverage.mgh');
-%save_mgh(vol, 'orig.stripped.mgz', M,mr);
-%result = MRIread('/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Orientation/surfaceData/sub1/angleBrain_sub1_lh_fsaverage.mgh');
+[~,M,mr] = load_mgh('/bwlab/Users/SeoheeHan/NSDData/rothzn/nsd/Curvature_filter/surfaceData/sub1/curvfilterBrain_max_sub1_lh_fsaverage.mgh');
 
-%% get all subjects volume in radians
-% what to do with -1 and 0?
-for isub=1:8
-    vol_lh(:,:,isub) = squeeze(load_mgh([filedir, 'sub', num2str(isub), '/curvBrainbyROI_sub', num2str(isub), '_lh_fsaverage.mgh']));
-    vol_rh(:,:,isub) = squeeze(load_mgh([filedir, 'sub', num2str(isub), '/curvBrainbyROI_sub', num2str(isub), '_rh_fsaverage.mgh']));
-end
+for imodel = 1:numel(modelList)
+    modelName = modelList{imodel};
+   
+    %% load volumes
+    clear vol_lh vol_rh R2_lh R2_rh
 
-vol_lh(vol_lh==0)=NaN;
-vol_lh(vol_lh==-1)=NaN;
-vol_rh(vol_rh==0)=NaN;
-vol_rh(vol_rh==-1)=NaN;
+    for isub = 1:nSub
+        vol_lh(:,:,isub) = squeeze(load_mgh([filedir,'sub',num2str(isub),'/', ...
+            modelName,'_sub',num2str(isub),'_lh_fsaverage.mgh']));
 
-%% weighted circ mean
-prefCurv_lh = [];
-prefCurv_rh = [];
-for iroi=1:size(vol_lh,2)
-    for ivox=1:size(vol_lh,1)
-        prefCurv_lh(ivox,iroi) = mean(squeeze(vol_lh(ivox,iroi,:)), 'omitnan');
+        vol_rh(:,:,isub) = squeeze(load_mgh([filedir,'sub',num2str(isub),'/', ...
+            modelName,'_sub',num2str(isub),'_rh_fsaverage.mgh']));
+
+        % R2 (same for all models unless you have model-specific R2)
+        R2_lh(:,:,isub) = squeeze(load_mgh([filedir,'sub',num2str(isub),'/', ...
+            'curvfilterBrain_R2_sub',num2str(isub),'_lh_fsaverage.mgh']));
+
+        R2_rh(:,:,isub) = squeeze(load_mgh([filedir,'sub',num2str(isub),'/', ...
+            'curvfilterBrain_R2_sub',num2str(isub),'_rh_fsaverage.mgh']));
     end
-end
-for iroi=1:size(vol_rh,2)
-    for ivox=1:size(vol_rh,1)
-        prefCurv_rh(ivox,iroi) = mean(squeeze(vol_rh(ivox,iroi,:)), 'omitnan');
-    end
-end
 
-prefCurv_lh = reshape(prefCurv_lh, size(mghfile));
-prefCurv_rh = reshape(prefCurv_rh, size(mghfile));
 
-%% save
-fileName_lh = [filedir,'curvBrainbyROI_groupmean_lh_fsaverage.mgh'];
-fileName_rh = [filedir, 'curvBrainbyROI_groupmean_rh_fsaverage.mgh'];
-save_mgh(prefCurv_lh, fileName_lh, M,mr);
-save_mgh(prefCurv_rh, fileName_rh, M,mr);
+    %% weighted mean
+    R2_lh_pos = R2_lh;
+    R2_lh_pos = R2_lh_pos - min(R2_lh_pos, [], 3);
+    R2_rh_pos = R2_rh;
+    R2_rh_pos = R2_rh_pos - min(R2_rh_pos, [], 3);
+
+    prefCurv_lh = nansum(vol_lh .* R2_lh_pos, 2) ./ nansum(R2_lh_pos, 2);
+    prefCurv_rh = nansum(vol_rh .* R2_rh_pos, 2) ./ nansum(R2_rh_pos, 2);
+
+
+
+    %% save
+    save_mgh(prefCurv_lh, ...
+        [filedir, modelName, '_groupmean_lh_fsaverage.mgh'], M, mr);
+
+    save_mgh(prefCurv_rh, ...
+        [filedir, modelName, '_groupmean_rh_fsaverage.mgh'], M, mr);
+
+
+    % %% Top-50% R² voxel survival
+    % 
+    % meanR2_lh = nanmean(R2_lh, 2);
+    % meanR2_rh = nanmean(R2_rh, 2);
+    % 
+    % thr_lh = prctile(meanR2_lh, 50);
+    % thr_rh = prctile(meanR2_rh, 50);
+    % 
+    % mask_lh = meanR2_lh >= thr_lh;
+    % mask_rh = meanR2_rh >= thr_rh;
+    % 
+    % prefCurv_lh_top50 = prefCurv_lh;
+    % prefCurv_rh_top50 = prefCurv_rh;
+    % 
+    % prefCurv_lh_top50(~mask_lh) = NaN;
+    % prefCurv_rh_top50(~mask_rh) = NaN;
+    % 
+    % 
+    % save_mgh(prefCurv_lh_top50, ...
+    %     [filedir, modelName, '_groupmean_lh_fsaverage_top50R2.mgh'], M, mr);
+    % 
+    % save_mgh(prefCurv_rh_top50, ...
+    %     [filedir, modelName, '_groupmean_rh_fsaverage_top50R2.mgh'], M, mr);
+end
