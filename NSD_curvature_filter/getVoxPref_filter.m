@@ -37,6 +37,7 @@ for isub = 1:8
         
         load(fullfile(prffolder,['regressPrfSplit' bandpassStr '_v' num2str(visualRegion) '_sub' num2str(isub)  '.mat']), ...
             'nsd', 'numLevels', 'numCurvs','rois','nvox','roiPrf','nsplits');
+        nsd.r2curvSplit = nsd.r2lenSplit;
 
         % get mean coef/R2
         if visualRegion == 4 || visualRegion == 5 || visualRegion == 6 || visualRegion == 7
