@@ -1,0 +1,305 @@
+# ---------*----------*---------*---------*---------*---------*---------*---------#
+# ------------------------------------------------------------------------------- #
+#                               R2                          #
+#
+#            By Seohee Han
+# ------------------------------------------------------------------------------- #
+# Date: 2024-09-14
+# Environment: R Studio Cloud, Windows 10 / macOS Big Sur
+# ------------------------------------------------------------------------------- #
+# ---------*----------*---------*---------*---------*---------*---------*---------#
+
+# get ready
+rm(list=ls())
+set.seed(4228) # for replication
+
+# load packages 
+pacman::p_load(tidyverse, emmeans, tidyr, dplyr, knitr, ggpubr, rstatix, lmerTest, ggdist, purrr)
+options(knitr.kable.NA = '') # hide NA with knitr function
+
+## ---------------------------------------------------------- #
+## 1. load data ####
+## ---------------------------------------------------------- #
+getwd()
+
+files_mlv <- c(
+  "V1R2_MLV.csv", "V2R2_MLV.csv", "V3R2_MLV.csv",
+  "hV4R2_MLV.csv", "OPAR2_MLV.csv", "PPAR2_MLV.csv",
+  "RSCR2_MLV.csv"
+)
+
+# Corresponding filter files (if they follow the same pattern)
+files_filter <- sub("MLV", "filter", files_mlv)
+
+# All files together
+files <- c(files_mlv, files_filter)
+
+# Extract ROI: everything before "R2_"
+get_roi <- function(fname) {
+  base <- sub("\\.csv$", "", fname)
+  roi  <- sub("R2_.*$", "", base)
+  roi
+}
+
+# Extract method: everything after "R2_"
+get_method <- function(fname) {
+  base   <- sub("\\.csv$", "", fname)
+  method <- sub(".*R2_", "", base)
+  method
+}
+
+read_with_roi_method <- function(fname) {
+  df <- read.csv(fname, stringsAsFactors = FALSE)
+  # Rename first column to R2 (adjust if needed)
+  names(df)[1] <- "R2"
+  # Add ROI and method columns from filename
+  df$ROI    <- get_roi(fname)
+  df$method <- get_method(fname)
+  df
+}
+
+dat_list <- lapply(files, read_with_roi_method)
+names(dat_list) <- get_roi(files)
+
+all_data <- do.call(rbind, dat_list)
+all_data$ROI <- factor(
+  all_data$ROI,
+  levels = c("V1", "V2", "V3", "hV4", "OPA", "PPA", "RSC")
+)
+all_data <- all_data %>%
+  mutate(method = recode(method, MLV = "contour"))
+
+# Re‑set factor order if needed
+all_data$method <- factor(all_data$method,
+                          levels = c("contour", "filter"))
+## ---------------------------------------------------------- #
+## 2. Descriptive ####
+## ---------------------------------------------------------- #
+## Descriptives for MLV only ---------------------------------------
+all_data_mlv <- all_data %>% filter(method == "contour")
+
+min(all_data_mlv$R2)
+max(all_data_mlv$R2)
+hist(all_data_mlv$R2, main = "R2 histogram (contour)")
+
+summary_all_mlv <- all_data_mlv %>%
+  summarise(
+    n          = n(),
+    n_R2_pos   = sum(R2 > 0, na.rm = TRUE),
+    prop_R2_pos = mean(R2 > 0, na.rm = TRUE),
+    mean_R2_pos = ifelse(n_R2_pos > 0,
+                         mean(R2[R2 > 0], na.rm = TRUE),
+                         NA_real_)
+  )
+summary_all_mlv
+
+summary_by_roi_mlv <- all_data_mlv %>%
+  group_by(ROI) %>%
+  summarise(
+    n          = n(),
+    n_R2_pos   = sum(R2 > 0, na.rm = TRUE),
+    prop_R2_pos = mean(R2 > 0, na.rm = TRUE),
+    mean_R2_pos = ifelse(n_R2_pos > 0,
+                         mean(R2[R2 > 0], na.rm = TRUE),
+                         NA_real_)
+  )
+summary_by_roi_mlv
+
+## Descriptives for filter only ------------------------------------
+all_data_filter <- all_data %>% filter(method == "filter")
+
+min(all_data_filter$R2)
+max(all_data_filter$R2)
+hist(all_data_filter$R2, main = "R2 histogram (filter)")
+
+summary_all_filter <- all_data_filter %>%
+  summarise(
+    n          = n(),
+    n_R2_pos   = sum(R2 > 0, na.rm = TRUE),
+    prop_R2_pos = mean(R2 > 0, na.rm = TRUE),
+    mean_R2_pos = ifelse(n_R2_pos > 0,
+                         mean(R2[R2 > 0], na.rm = TRUE),
+                         NA_real_)
+  )
+summary_all_filter
+
+summary_by_roi_filter <- all_data_filter %>%
+  group_by(ROI) %>%
+  summarise(
+    n          = n(),
+    n_R2_pos   = sum(R2 > 0, na.rm = TRUE),
+    prop_R2_pos = mean(R2 > 0, na.rm = TRUE),
+    mean_R2_pos = ifelse(n_R2_pos > 0,
+                         mean(R2[R2 > 0], na.rm = TRUE),
+                         NA_real_)
+  )
+summary_by_roi_filter
+
+## ---------------------------------------------------------- #
+## 3. Statistical tests ####
+## ---------------------------------------------------------- #
+summary_by_roi_method <- all_data %>%
+  group_by(ROI, method) %>%
+  summarise(
+    n          = n(),
+    n_R2_pos   = sum(R2 > 0, na.rm = TRUE),
+    prop_R2_pos = mean(R2 > 0, na.rm = TRUE),
+    mean_R2_pos = ifelse(n_R2_pos > 0,
+                         mean(R2[R2 > 0], na.rm = TRUE),
+                         NA_real_),
+    .groups = "drop"
+  )
+
+
+# "Proportion of positive R2 values by ROI"
+prop_tests <- summary_by_roi_method %>%
+  group_by(ROI) %>%
+  group_modify(~ {
+    df <- .x
+    
+    if (nrow(df) != 2L) {
+      return(tibble(
+        method1 = NA_character_,
+        method2 = NA_character_,
+        prop1   = NA_real_,
+        prop2   = NA_real_,
+        p_prop  = NA_real_
+      ))
+    }
+    
+    x <- df$n_R2_pos
+    n <- df$n
+    
+    pt <- prop.test(x = x, n = n)
+    
+    tibble(
+      method1 = as.character(df$method[1]),
+      method2 = as.character(df$method[2]),
+      prop1   = x[1] / n[1],
+      prop2   = x[2] / n[2],
+      p_prop  = pt$p.value
+    )
+  }) %>%
+  ungroup() %>%
+  mutate(
+    p_prop_fdr = p.adjust(p_prop, method = "BH"),
+    sig_prop   = case_when(
+      is.na(p_prop_fdr)           ~ NA_character_,
+      p_prop_fdr < 0.001          ~ "***",
+      p_prop_fdr < 0.01           ~ "**",
+      p_prop_fdr < 0.05           ~ "*",
+      TRUE                        ~ "ns"
+    )
+  )
+
+prop_tests
+
+
+
+# "Mean positive R2 values by ROI"
+pos_data <- all_data %>%
+  filter(R2 > 0)
+
+## 2a.normality check ----------------
+
+ggplot(pos_data %>% filter(ROI == "hV4", method == "contour"),
+       aes(x = R2)) +
+  geom_histogram(bins = 50) +
+  theme_classic()
+
+ggplot(pos_data %>% filter(ROI == "hV4", method == "contour"),
+       aes(sample = R2)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_classic()
+
+ggplot(pos_data %>% filter(ROI == "hV4", method == "filter"),
+       aes(x = R2)) +
+  geom_histogram(bins = 50) +
+  theme_classic()
+
+ggplot(pos_data %>% filter(ROI == "hV4", method == "filter"),
+       aes(sample = R2)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_classic()
+
+## 2b. Wilcoxon rank‑sum tests by ROI × method ----------------
+pos_data <- all_data %>% filter(R2 > 0)
+
+wilcox_results <- pos_data %>%
+  group_by(ROI) %>%
+  group_modify(~ {
+    df <- .x
+    
+    if (length(unique(df$method)) < 2L) {
+      return(tibble(
+        method1   = NA_character_,
+        method2   = NA_character_,
+        median1   = NA_real_,
+        median2   = NA_real_,
+        mean1     = NA_real_,
+        mean2     = NA_real_,
+        p_wilcox  = NA_real_
+      ))
+    }
+    
+    w_res <- wilcox.test(R2 ~ method, data = df, exact = FALSE)
+    
+    lvl <- levels(df$method)
+    m1  <- lvl[1]
+    m2  <- lvl[2]
+    
+    tibble(
+      method1   = m1,
+      method2   = m2,
+      median1   = median(df$R2[df$method == m1]),
+      median2   = median(df$R2[df$method == m2]),
+      mean1     = mean(df$R2[df$method == m1]),
+      mean2     = mean(df$R2[df$method == m2]),
+      p_wilcox  = w_res$p.value
+    )
+  }) %>%
+  ungroup() %>%
+  mutate(
+    p_wilcox_fdr = p.adjust(p_wilcox, method = "BH"),
+    sig_wilcox   = case_when(
+      is.na(p_wilcox_fdr)        ~ NA_character_,
+      p_wilcox_fdr < 0.001       ~ "***",
+      p_wilcox_fdr < 0.01        ~ "**",
+      p_wilcox_fdr < 0.05        ~ "*",
+      TRUE                       ~ "ns"
+    )
+  )
+
+wilcox_results
+
+## ---------------------------------------------------------- #
+## 4. Plots ####
+## ---------------------------------------------------------- #
+
+# "Proportion of positive R2 values by ROI"
+
+ggplot(summary_by_roi_method,
+       aes(x = ROI, y = prop_R2_pos, fill = method)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  coord_cartesian(ylim = c(0.2, 0.95)) +
+  labs(
+    x = "ROI",
+    y = "Proportion of R2 > 0",
+    fill = "Method"
+  ) +
+  theme_classic()
+
+# "Mean positive R2 values by ROI"
+ggplot(summary_by_roi_method,
+       aes(x = ROI, y = mean_R2_pos, fill = method)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  coord_cartesian(ylim = c(0.002, 0.05)) +
+  labs(
+    x = "ROI",
+    y = "Mean R2 (R2 > 0 only)",
+    fill = "Method"
+  ) +
+  theme_classic()
+
