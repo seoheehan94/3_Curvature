@@ -39,9 +39,12 @@ for imodel = 1:numel(modelList)
 
     %% weighted mean
     R2_lh_pos = R2_lh;
-    R2_lh_pos = R2_lh_pos - min(R2_lh_pos, [], 2);
+    % R2_lh_pos = R2_lh_pos - min(R2_lh_pos, [], 2);
     R2_rh_pos = R2_rh;
-    R2_rh_pos = R2_rh_pos - min(R2_rh_pos, [], 2);
+    % R2_rh_pos = R2_rh_pos - min(R2_rh_pos, [], 2);
+    R2_lh_pos(R2_lh_pos <= 0) = NaN;
+    R2_rh_pos(R2_rh_pos <= 0) = NaN;
+
 
     prefCurv_lh = nansum(vol_lh .* R2_lh_pos, 2) ./ nansum(R2_lh_pos, 2);
     prefCurv_rh = nansum(vol_rh .* R2_rh_pos, 2) ./ nansum(R2_rh_pos, 2);
@@ -120,9 +123,12 @@ for imodel = 1:numel(modelList)
 
     %% weighted mean
     R2_lh_pos = R2_lh;
-    R2_lh_pos = R2_lh_pos - min(R2_lh_pos, [], 3);
+    % R2_lh_pos = R2_lh_pos - min(R2_lh_pos, [], 3);
     R2_rh_pos = R2_rh;
-    R2_rh_pos = R2_rh_pos - min(R2_rh_pos, [], 3);
+    % R2_rh_pos = R2_rh_pos - min(R2_rh_pos, [], 3);
+    R2_lh_pos(R2_lh_pos <= 0) = NaN;
+    R2_rh_pos(R2_rh_pos <= 0) = NaN;
+
 
     prefCurv_lh = nansum(vol_lh .* R2_lh_pos, 2) ./ nansum(R2_lh_pos, 2);
     prefCurv_rh = nansum(vol_rh .* R2_rh_pos, 2) ./ nansum(R2_rh_pos, 2);

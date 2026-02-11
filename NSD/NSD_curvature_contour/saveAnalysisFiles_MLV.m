@@ -51,14 +51,11 @@ for isub = 1:8
 end
 
 % Build table: subj, ROI, R2, curv
-T_R2 = table(subj_all, roi_all, R2_all, ...
-             'VariableNames', {'subj', 'ROI', 'R2'});
-T_curv = table(subj_all, roi_all, curv_all, ...
-             'VariableNames', {'subj', 'ROI', 'curvPref'});
+T_all = table(subj_all, roi_all, R2_all, curv_all,...
+             'VariableNames', {'subj', 'ROI', 'R2', 'curvPref'});
 
 % Save one "all ROI" file for MLV
-writetable(T_R2, fullfile(save_analysisfolder, 'allROI_R2_MLV.csv'));
-writetable(T_curv, fullfile(save_analysisfolder, 'allROI_curvPref_MLV.csv'));
+writetable(T_all, fullfile(save_analysisfolder, 'allROI_MLV.csv'));
 
 
 
