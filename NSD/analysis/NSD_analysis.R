@@ -22,38 +22,28 @@ options(knitr.kable.NA = '') # hide NA with knitr function
 ## ---------------------------------------------------------- #
 
 # R2 for MLV (to be called "contour")
-R2_mlv <- read_csv("allROI_R2_MLV.csv") %>%
+all_mlv <- read_csv("allROI_MLV.csv") %>%
   mutate(method = "contour")
 
 # R2 for filter
-R2_filter <- read_csv("allROI_R2_filter.csv") %>%
+all_filter <- read_csv("allROI_filter.csv") %>%
   mutate(method = "filter")
 
 # Combine
-all_R2 <- bind_rows(R2_mlv, R2_filter) %>%
+all_data <- bind_rows(all_mlv, all_filter) %>%
   mutate(
     ROI = factor(ROI, levels = c("V1", "V2", "V3", "hV4", "OPA", "PPA", "RSC")),
     method = factor(method, levels = c("contour", "filter"))
   )
 
-# Curvature preference for MLV (contour)
-curv_mlv <- read_csv("allROI_curvPref_MLV.csv") %>%
-  mutate(method = "contour")
+all_data_pos <- all_data %>%
+  filter(R2 > 0)
 
-# Curvature preference for filter
-curv_filter <- read_csv("allROI_curvPref_filter.csv") %>%
-  mutate(method = "filter")
-
-all_curv <- bind_rows(curv_mlv, curv_filter) %>%
-  mutate(
-    ROI = factor(ROI, levels = c("V1", "V2", "V3", "hV4", "OPA", "PPA", "RSC")),
-    method = factor(method, levels = c("contour", "filter"))
-  )
 ## ---------------------------------------------------------- #
-## 2. Descriptive ####
+## 2a. Descriptive - R2 ####
 ## ---------------------------------------------------------- #
 ## Descriptives for MLV only ---------------------------------------
-all_data_mlv <- all_R2 %>% filter(method == "contour")
+all_data_mlv <- all_data %>% filter(method == "contour")
 
 min(all_data_mlv$R2)
 max(all_data_mlv$R2)
@@ -70,7 +60,7 @@ summary_all_mlv <- all_data_mlv %>%
   )
 summary_all_mlv
 
-summary_by_roi_mlv <- all_data_mlv %>%
+summary_by_roi_mlv <- all_data %>%
   group_by(ROI) %>%
   summarise(
     n          = n(),
@@ -83,7 +73,7 @@ summary_by_roi_mlv <- all_data_mlv %>%
 summary_by_roi_mlv
 
 ## Descriptives for filter only ------------------------------------
-all_data_filter <- all_R2 %>% filter(method == "filter")
+all_data_filter <- all_data %>% filter(method == "filter")
 
 min(all_data_filter$R2)
 max(all_data_filter$R2)
@@ -113,10 +103,33 @@ summary_by_roi_filter <- all_data_filter %>%
 summary_by_roi_filter
 
 ## ---------------------------------------------------------- #
-## 3. Statistical tests ####
+## 2a. Descriptive - curvPref ####
+## ---------------------------------------------------------- #
+curv_summary <- all_data_pos %>%
+  group_by(ROI, method) %>%
+  summarise(
+    n_vox    = n(),
+    mean_curv = mean(curvPref, na.rm = TRUE),
+    median_curv = median(curvPref, na.rm = TRUE),
+    .groups = "drop"
+  )
+curv_summary
+
+curv_hist <- all_data_pos %>%
+  group_by(ROI, method, curvPref) %>%
+  summarise(n_vox = n(), .groups = "drop")
+
+curv_hist_prop <- curv_hist %>%
+  group_by(ROI, method) %>%
+  mutate(prop = n_vox / sum(n_vox)) %>%
+  ungroup()
+
+
+## ---------------------------------------------------------- #
+## 3a. Statistical tests - R2####
 ## ---------------------------------------------------------- #
 # Per subject × ROI × method
-subj_summary <- all_R2 %>%   
+subj_summary <- all_data %>%   
   group_by(subj, ROI, method) %>%
   summarise(
     n_vox        = n(),
@@ -153,17 +166,15 @@ prop_tests_subj <- subj_prop_wide %>%
   mutate(
     p_prop_wilcox_fdr = p.adjust(p_prop_wilcox, method = "BH"),
     sig_prop          = case_when(
-      is.na(p_prop_wilcox)         ~ NA_character_,
-      p_prop_wilcox < 0.001        ~ "***",
-      p_prop_wilcox < 0.01         ~ "**",
-      p_prop_wilcox < 0.05         ~ "*",
+      is.na(p_prop_wilcox_fdr)         ~ NA_character_,
+      p_prop_wilcox_fdr < 0.001        ~ "***",
+      p_prop_wilcox_fdr < 0.01         ~ "**",
+      p_prop_wilcox_fdr < 0.05         ~ "*",
       TRUE                             ~ "ns"
     )
   )
 
 prop_tests_subj
-
-
 
 
 
@@ -195,21 +206,87 @@ wilcox_results_subj <- subj_mean_wide %>%
   mutate(
     p_wilcox_fdr = p.adjust(p_wilcox, method = "BH"),
     sig_wilcox   = case_when(
-      is.na(p_wilcox)        ~ NA_character_,
-      p_wilcox < 0.001       ~ "***",
-      p_wilcox < 0.01        ~ "**",
-      p_wilcox < 0.05        ~ "*",
+      is.na(p_wilcox_fdr)        ~ NA_character_,
+      p_wilcox_fdr < 0.001       ~ "***",
+      p_wilcox_fdr < 0.01        ~ "**",
+      p_wilcox_fdr < 0.05        ~ "*",
       TRUE                       ~ "ns"
     )
   )
 
 wilcox_results_subj
 
+## ---------------------------------------------------------- #
+## 3a. Statistical tests - curvPref####
+## ---------------------------------------------------------- #
+
+# Add method-specific voxel index
+curv_indexed <- all_data_pos %>%
+  group_by(subj, ROI, method) %>%
+  mutate(voxel_idx = row_number()) %>%  # index within each subj × ROI × method
+  ungroup()
+
+# Split and rename
+curv_contour <- curv_indexed %>%
+  filter(method == "contour") %>%
+  select(subj, ROI, voxel_idx, curv_contour = curvPref)
+
+curv_filter <- curv_indexed %>%
+  filter(method == "filter") %>%
+  select(subj, ROI, voxel_idx, curv_filter = curvPref)
+
+# Join on subj, ROI, voxel_idx: ensures both methods present for same "voxel"
+curv_wide <- curv_contour %>%
+  inner_join(curv_filter,
+             by = c("subj", "ROI", "voxel_idx"))
+
+# Correlation per subj × ROI
+curv_corr_by_subj <- curv_wide %>%
+  group_by(subj, ROI) %>%
+  summarise(
+    n_vox   = n(),
+    r_spear = cor(curv_contour, curv_filter, method = "spearman"),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    z_spear = atanh(r_spear)
+  )
+
+# One-sample t-tests on Fisher z, per ROI
+corr_tests <- curv_corr_by_subj %>%
+  group_by(ROI) %>%
+  summarise(
+    n_subj = sum(!is.na(z_spear)),
+    
+    # Spearman-based group test
+    mean_r_spear = mean(r_spear, na.rm = TRUE),
+    mean_z_spear = mean(z_spear, na.rm = TRUE),
+    p_spear = if (n_subj > 1)
+      t.test(z_spear, mu = 0)$p.value
+    else NA_real_,
+    
+    .groups = "drop"
+  ) %>%
+  mutate(
+    p_spear_fdr = p.adjust(p_spear, method = "BH")
+  )
+
+corr_tests <- corr_tests %>%
+  mutate(
+    sig_spear = case_when(
+      is.na(p_spear_fdr)      ~ NA_character_,
+      p_spear_fdr < 0.001     ~ "***",
+      p_spear_fdr < 0.01      ~ "**",
+      p_spear_fdr < 0.05      ~ "*",
+      TRUE                ~ "ns"
+    )
+  )
+corr_tests
 
 ## ---------------------------------------------------------- #
-## 4. Plots ####
+## 4a. Plots - R2 ####
 ## ---------------------------------------------------------- #
-summary_by_roi_method <- all_R2 %>%
+summary_by_roi_method <- all_data %>%
   group_by(ROI, method) %>%
   summarise(
     n            = n(),
@@ -254,7 +331,7 @@ ggplot(summary_by_roi_method,
     y = "Proportion of R2 > 0",
     fill = "Method"
   ) +
-  theme_classic(base_size = 14)
+  theme_classic(base_size = 18)
 
 
 # "Mean positive R2 values by ROI"
@@ -276,7 +353,7 @@ ggplot(summary_by_roi_method,
     position = dodge,
     width = 0.2
   ) +
-  coord_cartesian(ylim = c(0.002, 0.055)) +
+  coord_cartesian(ylim = c(0.002, 0.06)) +
   geom_text(data = mean_labels,
             aes(x = ROI, y = y_pos, label = sig_wilcox),
             inherit.aes = FALSE,
@@ -286,7 +363,61 @@ ggplot(summary_by_roi_method,
     y = "Mean R2 (R2 > 0 only)",
     fill = "Method"
   ) +
-  theme_classic(base_size = 14)
+  theme_classic(base_size = 18)
+
+## ---------------------------------------------------------- #
+## 4a. Plots - curvPref ####
+## ---------------------------------------------------------- #
+dodge <- position_dodge(width = 0.7)
+
+# Early visual ROIs: V1–hV4
+curv_hist_prop_ev <- curv_hist_prop %>%
+  filter(ROI %in% c("V1", "V2", "V3", "hV4"))
+
+ggplot(curv_hist_prop_ev,
+       aes(x = factor(curvPref), y = prop, fill = method)) +
+  geom_col(position = dodge, width = 0.6) +
+  facet_wrap(~ ROI, nrow = 1) +   # no scales = "free_y" → shared y axis
+  scale_y_continuous(
+    limits = c(0, 0.45),           # adjust to your max
+    breaks = seq(0, 0.45, by = 0.1),
+    expand = expansion(mult = c(0, 0.05))  # no gap at 0
+  ) +
+  labs(
+    x = "Preferred curvature level",
+    y = "Proportion of voxels",
+    fill = "Method"
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    strip.background = element_blank(),
+    panel.spacing.x = unit(0.8, "lines"),
+    plot.margin = margin(t = 5, r = 5, b = 10, l = 5)
+  )
 
 
+# Scene ROIs: OPA, PPA, RSC
+curv_hist_prop_scene <- curv_hist_prop %>%
+  filter(ROI %in% c("OPA", "PPA", "RSC"))
+
+ggplot(curv_hist_prop_scene,
+       aes(x = factor(curvPref), y = prop, fill = method)) +
+  geom_col(position = dodge, width = 0.6) +
+  facet_wrap(~ ROI, nrow = 1) +   # no scales = "free_y" → shared y axis
+  scale_y_continuous(
+    limits = c(0, 0.45),           # adjust to your max
+    breaks = seq(0, 0.45, by = 0.1),
+    expand = expansion(mult = c(0, 0.05))  # no gap at 0
+  ) +
+  labs(
+    x = "Preferred curvature bin",
+    y = "Proportion of voxels",
+    fill = "Method"
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    strip.background = element_blank(),
+    panel.spacing.x = unit(0.8, "lines"),
+    plot.margin = margin(t = 5, r = 5, b = 10, l = 5)
+  )
 
