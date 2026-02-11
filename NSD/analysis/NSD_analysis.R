@@ -36,6 +36,19 @@ all_R2 <- bind_rows(R2_mlv, R2_filter) %>%
     method = factor(method, levels = c("contour", "filter"))
   )
 
+# Curvature preference for MLV (contour)
+curv_mlv <- read_csv("allROI_curvPref_MLV.csv") %>%
+  mutate(method = "contour")
+
+# Curvature preference for filter
+curv_filter <- read_csv("allROI_curvPref_filter.csv") %>%
+  mutate(method = "filter")
+
+all_curv <- bind_rows(curv_mlv, curv_filter) %>%
+  mutate(
+    ROI = factor(ROI, levels = c("V1", "V2", "V3", "hV4", "OPA", "PPA", "RSC")),
+    method = factor(method, levels = c("contour", "filter"))
+  )
 ## ---------------------------------------------------------- #
 ## 2. Descriptive ####
 ## ---------------------------------------------------------- #
@@ -152,6 +165,8 @@ prop_tests_subj
 
 
 
+
+
 # "Mean positive R2 values by ROI"
 
 # Wide format: contour vs filter mean R2 per subj × ROI
@@ -239,7 +254,7 @@ ggplot(summary_by_roi_method,
     y = "Proportion of R2 > 0",
     fill = "Method"
   ) +
-  theme_classic(base_size = 18)
+  theme_classic(base_size = 14)
 
 
 # "Mean positive R2 values by ROI"
@@ -271,7 +286,7 @@ ggplot(summary_by_roi_method,
     y = "Mean R2 (R2 > 0 only)",
     fill = "Method"
   ) +
-  theme_classic(base_size = 18)
+  theme_classic(base_size = 14)
 
 
 
